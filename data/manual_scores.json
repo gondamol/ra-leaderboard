@@ -1,0 +1,59 @@
+{
+  "2025_12": {
+    "griffin": {
+      "journal": 4,
+      "feedback": 4,
+      "team": 4
+    },
+    "ann": {
+      "journal": 4,
+      "feedback": 5,
+      "team": 0
+    },
+    "gideon": {
+      "journal": 4,
+      "feedback": 5,
+      "team": 0
+    },
+    "bilha": {
+      "journal": 5,
+      "feedback": 4,
+      "team": 5
+    },
+    "nema": {
+      "journal": 3,
+      "feedback": 4,
+      "team": 4
+    },
+    "josephine": {
+      "journal": 0,
+      "feedback": 5,
+      "team": 4
+    },
+    "kiti": {
+      "journal": 4,
+      "feedback": 5,
+      "team": 0
+    },
+    "abi": {
+      "journal": 5,
+      "feedback": 5,
+      "team": 5
+    },
+    "joyce": {
+      "journal": 3,
+      "feedback": 3,
+      "team": 5
+    },
+    "faith": {
+      "journal": 4,
+      "feedback": 4,
+      "team": 5
+    },
+    "fardosa": {
+      "journal": 4,
+      "feedback": 5,
+      "team": 5
+    }
+  }
+}
