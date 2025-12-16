@@ -911,7 +911,6 @@ def render_quality_guidelines():
 def render_quality_issues(quality_df: pd.DataFrame, month_name: str):
     """Render quality issues analysis with RA filter for training insights."""
     st.markdown(f"## 🔍 Quality Issues Analysis - {month_name}")
-    st.markdown("*Use this to identify patterns and areas to emphasize in team calls.*")
     
     if quality_df.empty:
         st.info("No quality issues data available. Click 'Refresh from Database' to load.")
