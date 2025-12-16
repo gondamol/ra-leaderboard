@@ -41,6 +41,7 @@ DATA_DIR = SCRIPT_DIR / "data"
 SQL_DIR = SCRIPT_DIR / "sql"
 MANUAL_SCORES_FILE = DATA_DIR / "manual_scores.json"
 CACHED_DATA_FILE = DATA_DIR / "cached_leaderboard.csv"
+CACHED_QUALITY_FILE = DATA_DIR / "cached_quality_issues.csv"
 
 # SQL files - use the PARENT scripts directly
 SQL_COMPLETION_FILE = SQL_DIR / "01_monthly_completion_checks.sql"
@@ -496,6 +497,19 @@ def load_cached_data() -> pd.DataFrame:
 def save_cached_data(df: pd.DataFrame):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     df.to_csv(CACHED_DATA_FILE, index=False)
+
+
+def load_cached_quality() -> pd.DataFrame:
+    """Load cached quality issues data."""
+    if CACHED_QUALITY_FILE.exists():
+        return pd.read_csv(CACHED_QUALITY_FILE)
+    return pd.DataFrame()
+
+
+def save_cached_quality(df: pd.DataFrame):
+    """Save quality issues data to cache."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    df.to_csv(CACHED_QUALITY_FILE, index=False)
 
 
 def load_manual_scores() -> dict:
@@ -1188,6 +1202,8 @@ def main():
                         
                         # Also fetch quality data for the issues analysis tab
                         quality_df = run_sql_file(SQL_QUALITY_FILE, start_date, end_date, "Quality Issues")
+                        if not quality_df.empty:
+                            save_cached_quality(quality_df)
                         st.session_state['quality_df'] = quality_df
                         
                         st.success(f"✅ Loaded {len(df)} RAs")
@@ -1220,7 +1236,10 @@ def main():
     
     df = load_cached_data()
     manual_scores = load_manual_scores()
-    quality_df = st.session_state.get('quality_df', pd.DataFrame())
+    # Load quality data from session state or cached file
+    quality_df = st.session_state.get('quality_df', None)
+    if quality_df is None or quality_df.empty:
+        quality_df = load_cached_quality()
     
     if df.empty:
         st.markdown(f'<div class="header-container"><h1>🏆 RA of the Month</h1><p>| {month_name}</p></div>', unsafe_allow_html=True)
