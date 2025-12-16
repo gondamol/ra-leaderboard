@@ -78,8 +78,12 @@ def get_db_connection_str() -> str:
     return ""
 
 
+# Detect if running on Streamlit Cloud
+IS_CLOUD_ENV = os.getenv("STREAMLIT_SHARING_MODE") is not None or os.getenv("STREAMLIT_SERVER_HEADLESS") == "true"
+
 DB_CONNECTION_STR = get_db_connection_str()
-DB_REFRESH_ENABLED = DB_AVAILABLE and bool(DB_CONNECTION_STR)
+# Disable DB refresh on cloud (can't connect to localhost from cloud)
+DB_REFRESH_ENABLED = DB_AVAILABLE and bool(DB_CONNECTION_STR) and not IS_CLOUD_ENV
 
 # RAs to exclude from dashboard (e.g., PI, supervisors)
 EXCLUDED_RAS = ['julie', 'cate']
@@ -1164,11 +1168,14 @@ def main():
         
         refresh_disabled = not DB_REFRESH_ENABLED
         if refresh_disabled:
-            st.info("Live database refresh is disabled. Using cached data. Add DB_CONN in Streamlit secrets or environment to enable.")
+            if IS_CLOUD_ENV:
+                st.info("☁️ Cloud mode: Showing cached data. Run locally to refresh from database.")
+            else:
+                st.info("⚠️ Database not available. Using cached data.")
         
         if st.button("🔄 Refresh from Database", type="primary", use_container_width=True,
                      disabled=refresh_disabled,
-                     help="Requires DB_CONN (env or Streamlit secrets) and a reachable MySQL database."):
+                     help="Refresh disabled on cloud. Run locally to update data."):
             with st.spinner("Running SQL scripts..."):
                 df = fetch_all_metrics(start_date, end_date)
                 if not df.empty:
