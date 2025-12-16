@@ -10,6 +10,7 @@ Dashboard aggregates both to RA level and displays all metrics.
 
 import os
 import json
+import socket
 from datetime import datetime
 from pathlib import Path
 
@@ -45,7 +46,40 @@ CACHED_DATA_FILE = DATA_DIR / "cached_leaderboard.csv"
 SQL_COMPLETION_FILE = SQL_DIR / "01_monthly_completion_checks.sql"
 SQL_QUALITY_FILE = SQL_DIR / "02_monthly_quality_checks_V1.sql"
 
-DB_CONNECTION_STR = os.getenv("DB_CONN", "mysql+mysqlconnector://root@127.0.0.1/fd_production")
+def _is_port_open(host: str, port: int, timeout: float = 1.0) -> bool:
+    """Return True if a TCP port is reachable."""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def get_db_connection_str() -> str:
+    """
+    Resolve the DB connection string.
+    - Prefer environment variable DB_CONN
+    - Then Streamlit secrets
+    - Finally, fall back to the local default only if MySQL is reachable
+    """
+    env_conn = os.getenv("DB_CONN")
+    if env_conn:
+        return env_conn
+    try:
+        secret_conn = st.secrets.get("DB_CONN")
+        if secret_conn:
+            return secret_conn
+    except Exception:
+        pass
+    
+    default_conn = "mysql+mysqlconnector://root@127.0.0.1/fd_production"
+    if _is_port_open("127.0.0.1", 3306):
+        return default_conn
+    return ""
+
+
+DB_CONNECTION_STR = get_db_connection_str()
+DB_REFRESH_ENABLED = DB_AVAILABLE and bool(DB_CONNECTION_STR)
 
 # RAs to exclude from dashboard (e.g., PI, supervisors)
 EXCLUDED_RAS = ['julie', 'cate']
@@ -145,6 +179,10 @@ def run_sql_file(sql_path: Path, start_date: str, end_date: str, label: str = ""
     sql = sql.replace('@start_date', f"'{start_date}'")
     sql = sql.replace('@end_date', f"'{end_date}'")
     
+    if not DB_REFRESH_ENABLED:
+        st.sidebar.warning("Database refresh is disabled. Configure DB_CONN in secrets or environment to enable.")
+        return pd.DataFrame()
+    
     try:
         engine = create_engine(DB_CONNECTION_STR)
         with engine.connect() as conn:
@@ -189,6 +227,10 @@ def fetch_all_metrics(start_date: str, end_date: str) -> pd.DataFrame:
     """
     if not DB_AVAILABLE:
         st.error("Database libraries not available")
+        return pd.DataFrame()
+    
+    if not DB_REFRESH_ENABLED:
+        st.error("Database refresh is disabled. Add DB_CONN to Streamlit secrets or environment, or run with MySQL accessible.")
         return pd.DataFrame()
     
     # Run completion checks
@@ -1120,7 +1162,13 @@ def main():
         start_date, end_date = get_date_range(month, year)
         st.info(f"📅 {start_date} to {end_date}")
         
-        if st.button("🔄 Refresh from Database", type="primary", use_container_width=True):
+        refresh_disabled = not DB_REFRESH_ENABLED
+        if refresh_disabled:
+            st.info("Live database refresh is disabled. Using cached data. Add DB_CONN in Streamlit secrets or environment to enable.")
+        
+        if st.button("🔄 Refresh from Database", type="primary", use_container_width=True,
+                     disabled=refresh_disabled,
+                     help="Requires DB_CONN (env or Streamlit secrets) and a reachable MySQL database."):
             with st.spinner("Running SQL scripts..."):
                 df = fetch_all_metrics(start_date, end_date)
                 if not df.empty:
@@ -1134,7 +1182,7 @@ def main():
                     st.success(f"✅ Loaded {len(df)} RAs")
                     st.rerun()
                 else:
-                    st.error("Could not fetch data")
+                    st.error("Could not fetch data from database. Showing cached data if available.")
         
         st.divider()
         st.markdown("### 🔐 Admin Access")
