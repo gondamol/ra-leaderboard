@@ -913,7 +913,7 @@ def render_quality_issues(quality_df: pd.DataFrame, month_name: str):
     st.markdown(f"## 🔍 Quality Issues Analysis - {month_name}")
     
     if quality_df.empty:
-        st.info("No quality issues data available. Click 'Refresh from Database' to load.")
+        st.info("Quality issues data is loaded from the local database. Run the app locally to view detailed issues.")
         return
     
     quality_df = normalize_columns(quality_df)
@@ -1177,30 +1177,23 @@ def main():
         start_date, end_date = get_date_range(month, year)
         st.info(f"📅 {start_date} to {end_date}")
         
-        refresh_disabled = not DB_REFRESH_ENABLED
-        if refresh_disabled:
-            if IS_CLOUD_ENV:
-                st.info("☁️ Cloud mode: Showing cached data. Run locally to refresh from database.")
-            else:
-                st.info("⚠️ Database not available. Using cached data.")
-        
-        if st.button("🔄 Refresh from Database", type="primary", use_container_width=True,
-                     disabled=refresh_disabled,
-                     help="Refresh disabled on cloud. Run locally to update data."):
-            with st.spinner("Running SQL scripts..."):
-                df = fetch_all_metrics(start_date, end_date)
-                if not df.empty:
-                    df = calculate_scores(df)
-                    save_cached_data(df)
-                    
-                    # Also fetch quality data for the issues analysis tab
-                    quality_df = run_sql_file(SQL_QUALITY_FILE, start_date, end_date, "Quality Issues")
-                    st.session_state['quality_df'] = quality_df
-                    
-                    st.success(f"✅ Loaded {len(df)} RAs")
-                    st.rerun()
-                else:
-                    st.error("Could not fetch data from database. Showing cached data if available.")
+        # Only show refresh button when database is available (local mode)
+        if DB_REFRESH_ENABLED:
+            if st.button("🔄 Refresh from Database", type="primary", use_container_width=True):
+                with st.spinner("Running SQL scripts..."):
+                    df = fetch_all_metrics(start_date, end_date)
+                    if not df.empty:
+                        df = calculate_scores(df)
+                        save_cached_data(df)
+                        
+                        # Also fetch quality data for the issues analysis tab
+                        quality_df = run_sql_file(SQL_QUALITY_FILE, start_date, end_date, "Quality Issues")
+                        st.session_state['quality_df'] = quality_df
+                        
+                        st.success(f"✅ Loaded {len(df)} RAs")
+                        st.rerun()
+                    else:
+                        st.error("Could not fetch data from database.")
         
         st.divider()
         st.markdown("### 🔐 Admin Access")
