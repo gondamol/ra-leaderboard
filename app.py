@@ -82,8 +82,20 @@ def get_db_connection_str() -> str:
 IS_CLOUD_ENV = os.getenv("STREAMLIT_SHARING_MODE") is not None or os.getenv("STREAMLIT_SERVER_HEADLESS") == "true"
 
 DB_CONNECTION_STR = get_db_connection_str()
-# Disable DB refresh on cloud (can't connect to localhost from cloud)
-DB_REFRESH_ENABLED = DB_AVAILABLE and bool(DB_CONNECTION_STR) and not IS_CLOUD_ENV
+
+# Check if DB is actually reachable (not just configured)
+# If connection string uses localhost/127.0.0.1, verify the port is open
+def _is_db_reachable() -> bool:
+    """Check if the configured database is actually reachable."""
+    if not DB_CONNECTION_STR:
+        return False
+    # Check if it's a localhost connection
+    if "127.0.0.1" in DB_CONNECTION_STR or "localhost" in DB_CONNECTION_STR:
+        return _is_port_open("127.0.0.1", 3306, timeout=2.0)
+    # For remote DBs, assume reachable (will fail gracefully if not)
+    return True
+
+DB_REFRESH_ENABLED = DB_AVAILABLE and _is_db_reachable()
 
 # RAs to exclude from dashboard (e.g., PI, supervisors)
 EXCLUDED_RAS = ['julie', 'cate']
