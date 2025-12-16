@@ -27,6 +27,7 @@ README_LOCAL.md
 data/manual_scores.json
 *.pdf
 test_*.py
+generate_cache.py
 
 # Environment
 .env
