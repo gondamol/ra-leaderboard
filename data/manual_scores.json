@@ -1,59 +1,136 @@
 {
   "2025_12": {
-    "griffin": {
-      "journal": 4,
-      "feedback": 4,
-      "team": 4
-    },
-    "ann": {
-      "journal": 4,
-      "feedback": 5,
-      "team": 0
-    },
-    "gideon": {
-      "journal": 4,
-      "feedback": 5,
+    "julie": {
+      "journal": 0,
+      "feedback": 0,
       "team": 0
     },
     "bilha": {
-      "journal": 5,
-      "feedback": 4,
-      "team": 5
-    },
-    "nema": {
-      "journal": 3,
-      "feedback": 4,
-      "team": 4
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
     },
     "josephine": {
       "journal": 0,
-      "feedback": 5,
-      "team": 4
+      "feedback": 0,
+      "team": 0
     },
-    "kiti": {
-      "journal": 4,
-      "feedback": 5,
+    "gideon": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
+    },
+    "nema": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
+    },
+    "ann": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
+    },
+    "griffin": {
+      "journal": 0,
+      "feedback": 0,
       "team": 0
     },
     "abi": {
-      "journal": 5,
-      "feedback": 5,
-      "team": 5
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
     },
-    "joyce": {
-      "journal": 3,
-      "feedback": 3,
-      "team": 5
+    "kiti": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
     },
     "faith": {
-      "journal": 4,
-      "feedback": 4,
-      "team": 5
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
+    },
+    "joyce": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
     },
     "fardosa": {
-      "journal": 4,
-      "feedback": 5,
-      "team": 5
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
+    }
+  },
+  "2025_11": {
+    "bilha": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
+    },
+    "josephine": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
+    },
+    "julie": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
+    },
+    "ann": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
+    },
+    "griffin": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
+    },
+    "nema": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
+    },
+    "faith": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
+    },
+    "abi": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
+    },
+    "gideon": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
+    },
+    "kiti": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
+    },
+    "fardosa": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
+    },
+    "cate": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
+    },
+    "joyce": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
+    },
+    "john": {
+      "journal": 0,
+      "feedback": 0,
+      "team": 0
     }
   }
 }
