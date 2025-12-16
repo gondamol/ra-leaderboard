@@ -23,7 +23,7 @@ Thumbs.db
 
 # Local/Sensitive files (DO NOT PUSH)
 README_LOCAL.md
-data/cached_leaderboard.csv
+# data/cached_leaderboard.csv  # ALLOWED - needed for cloud deployment
 data/manual_scores.json
 *.pdf
 test_*.py
