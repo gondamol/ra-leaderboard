@@ -2,6 +2,8 @@
    MONTHLY COMPLETION CHECKS FOR DIARIES 
    Members to filter out from well-being:
      - KTRAN12 - member_id = 363175609956200000 
+   Notes:
+     - Few cashflows check excludes HHs: KMURR18, KMURR10, KMURR12, KMURI30, KMURI35, KKWAL48
    
    Date Parameters:
      - @start_date: First day of month
@@ -67,17 +69,27 @@ goingson_check AS (
         UNION ALL SELECT 590778, 'Expected income did not come'
         UNION ALL SELECT 604032, 'Big fight/argument'
         UNION ALL SELECT 604227, 'New health issue'
-        -- UNION ALL SELECT 604233, 'Consumption from HH production'  -- DISABLED UNTIL JANUARY 2025
     )
     SELECT 
         i.interview_id,
         CASE 
-            WHEN COUNT(DISTINCT CASE WHEN vti.value IS NOT NULL THEN a.question_id END) < 11  -- was 11 when consumption was included (12 questions)
+            WHEN COUNT(
+                    DISTINCT CASE 
+                        WHEN vti.value IS NOT NULL
+                             AND NOT (gq.question_id = 604227 AND DATE(i.interview_start_date) < '2025-12-01')
+                        THEN a.question_id 
+                    END
+                 ) < CASE 
+                        WHEN DATE(i.interview_start_date) >= '2025-12-01' THEN 11 
+                        ELSE 10 
+                      END
             THEN 1 ELSE 0 
         END AS goingson_flag,
         GROUP_CONCAT(
             CASE 
-                WHEN vti.value IS NULL THEN gq.label
+                WHEN vti.value IS NULL
+                     AND NOT (gq.question_id = 604227 AND DATE(i.interview_start_date) < '2025-12-01')
+                THEN gq.label
             END 
             SEPARATOR '; '
         ) AS goingson_detail
@@ -163,10 +175,8 @@ wellbeing_check AS (
 ),
 
 -- ------------------------------------------------------------
--- 3. CONSUMPTION (RURAL) CHECK - DISABLED UNTIL JANUARY 2025
---    Uncomment this section for January checks
+-- 3. CONSUMPTION (RURAL) CHECK 
 -- ------------------------------------------------------------
-/*
 consumption_check AS (
     SELECT
         i.interview_id,
@@ -183,11 +193,11 @@ consumption_check AS (
             ELSE ''
         END AS consumption_detail
     FROM base_interviews i
-    LEFT JOIN answers a_604233
-        ON a_604233.interview_id = i.interview_id
-       AND a_604233.question_id = 604233
+    LEFT JOIN answers a_604236
+        ON a_604236.interview_id = i.interview_id
+       AND a_604236.question_id = 604236
     LEFT JOIN values_tinyint vti_consumption
-        ON a_604233.history_id = vti_consumption.history_id
+        ON a_604236.history_id = vti_consumption.history_id
     LEFT JOIN answers a_consumption
         ON a_consumption.interview_id = i.interview_id
        AND a_consumption.question_id IN (598626, 598629, 598632, 598635, 598731)
@@ -200,7 +210,6 @@ consumption_check AS (
     )
     GROUP BY i.interview_id, vti_consumption.value
 ),
-*/
 
 -- ------------------------------------------------------------
 -- 4. MAJOR EVENTS CHECK (unchanged)
@@ -280,7 +289,14 @@ hi_update_check AS (
             DATEDIFF(DATE(i.interview_start_date), ei.open_date)
                                         AS days_since_open,
             DATEDIFF(DATE(i.interview_start_date), ei.close_date)
-                                        AS days_since_close
+                                        AS days_since_close,
+            (
+                SELECT MAX(i2.interview_start_date)
+                FROM interviews i2
+                WHERE i2.household_id = i.hh_id
+                  AND i2.status = 1
+                  AND i2.interview_start_date < i.interview_start_date
+            ) AS prev_interview_date
         FROM base_interviews i
         JOIN entity_items ei
               ON ei.household_id = i.hh_id
@@ -296,6 +312,14 @@ hi_update_check AS (
                          m.status = 1
                      AND NOT EXISTS (
                          SELECT 1
+                         FROM status s_out
+                         WHERE s_out.entity_type = 51
+                           AND s_out.entity_id   = m.id
+                           AND s_out.type        = 2
+                           AND s_out.status_date <= DATE(i.interview_start_date)
+                     )
+                     AND NOT EXISTS (
+                         SELECT 1
                          FROM status s
                          WHERE s.entity_type = 51
                            AND s.entity_id   = m.id
@@ -309,6 +333,24 @@ hi_update_check AS (
                 ei.close_date IS NULL
                 OR DATEDIFF(DATE(i.interview_start_date), ei.close_date) <= 14
               )
+          AND NOT (
+                (
+                    SELECT MAX(i2.interview_start_date)
+                    FROM interviews i2
+                    WHERE i2.household_id = i.hh_id
+                      AND i2.status = 1
+                      AND i2.interview_start_date < i.interview_start_date
+                ) IS NOT NULL
+                AND ei.open_date >= (
+                    SELECT MAX(i2.interview_start_date)
+                    FROM interviews i2
+                    WHERE i2.household_id = i.hh_id
+                      AND i2.status = 1
+                      AND i2.interview_start_date < i.interview_start_date
+                )
+                AND ei.close_date IS NOT NULL
+                AND DATE(ei.close_date) <= DATE(i.interview_start_date)
+          )
     ),
     hi_updates AS (
         SELECT
@@ -317,7 +359,7 @@ hi_update_check AS (
             COUNT(DISTINCT a.id)     AS hu_answer_count
         FROM answers a
         WHERE a.entity_type = 60
-          AND a.question_id = 604065
+          AND a.question_id IN (604065, 600726)
         GROUP BY a.interview_id, a.entity_id
     )
     SELECT
@@ -485,10 +527,12 @@ cashflow_few_check AS (
     SELECT
         i.interview_id,
         CASE 
+            WHEN i.household_code IN ('KMURR18', 'KMURR10', 'KMURR12', 'KMURI30', 'KMURI35', 'KKWAL48') THEN 0
             WHEN COUNT(cf.id) > 0 AND COUNT(cf.id) < 20 THEN 1 
             ELSE 0 
         END AS cashflowfew_flag,
         CASE 
+            WHEN i.household_code IN ('KMURR18', 'KMURR10', 'KMURR12', 'KMURI30', 'KMURI35', 'KKWAL48') THEN ''
             WHEN COUNT(cf.id) > 0 AND COUNT(cf.id) < 20 
             THEN CONCAT('Only ', COUNT(cf.id), ' cashflows recorded')
             ELSE ''
@@ -565,7 +609,7 @@ SELECT
     
     (COALESCE(go.goingson_flag,         0) +
      COALESCE(wb.wellbeing_flag,        0) + 
-     -- COALESCE(cs.consumption_flag,      0) +  -- DISABLED UNTIL JANUARY 2025
+     COALESCE(cs.consumption_flag,      0) + 
      COALESCE(me.majorevents_flag,      0) +
      COALESCE(ch.change_flag,           0) + 
      COALESCE(hi.hi_update_flag,        0) +
@@ -579,7 +623,7 @@ SELECT
     CASE 
         WHEN (COALESCE(go.goingson_flag,         0) +
               COALESCE(wb.wellbeing_flag,        0) + 
-              -- COALESCE(cs.consumption_flag,      0) +  -- DISABLED UNTIL JANUARY 2025
+              COALESCE(cs.consumption_flag,      0) + 
               COALESCE(me.majorevents_flag,      0) +
               COALESCE(ch.change_flag,           0) + 
               COALESCE(hi.hi_update_flag,        0) +
@@ -595,7 +639,7 @@ SELECT
     
     COALESCE(go.goingson_flag,         0) AS 'Goings-on',
     COALESCE(wb.wellbeing_flag,        0) AS 'Well-being',
-    -- COALESCE(cs.consumption_flag,      0) AS 'Consumption (Rural)',  -- DISABLED UNTIL JANUARY 2025
+    COALESCE(cs.consumption_flag,      0) AS 'Consumption (Rural)',
     COALESCE(me.majorevents_flag,      0) AS 'Major Events',
     COALESCE(ch.change_flag,           0) AS 'Changes since last visit',
     COALESCE(hi.hi_update_flag,        0) AS 'Health Updates',
@@ -608,7 +652,7 @@ SELECT
     CONCAT_WS(' | ',
         NULLIF(COALESCE(go.goingson_detail,         ''), ''),
         NULLIF(COALESCE(wb.wellbeing_detail,        ''), ''),
-        -- NULLIF(COALESCE(cs.consumption_detail,      ''), ''),  -- DISABLED UNTIL JANUARY 2025
+        NULLIF(COALESCE(cs.consumption_detail,      ''), ''),
         NULLIF(COALESCE(me.majorevents_detail,      ''), ''),
         NULLIF(COALESCE(ch.change_detail,           ''), ''),
         NULLIF(COALESCE(hi.hi_update_detail,        ''), ''),
@@ -621,7 +665,7 @@ SELECT
     
     COALESCE(go.goingson_detail,       '') AS goingson_detail,
     COALESCE(wb.wellbeing_detail,      '') AS wellbeing_detail,
-    -- COALESCE(cs.consumption_detail,    '') AS consumption_detail,  -- DISABLED UNTIL JANUARY 2025
+    COALESCE(cs.consumption_detail,    '') AS consumption_detail,
     COALESCE(me.majorevents_detail,    '') AS majorevents_detail,
     COALESCE(ch.change_detail,         '') AS change_detail,
     COALESCE(hi.hi_update_detail,      '') AS hi_update_detail,
@@ -633,7 +677,7 @@ FROM base_interviews bi
 LEFT JOIN primary_member        pm ON pm.interview_id = bi.interview_id AND pm.rn = 1
 LEFT JOIN goingson_check        go ON go.interview_id = bi.interview_id
 LEFT JOIN wellbeing_check       wb ON wb.interview_id = bi.interview_id
--- LEFT JOIN consumption_check     cs ON cs.interview_id = bi.interview_id  -- DISABLED UNTIL JANUARY 2025
+LEFT JOIN consumption_check     cs ON cs.interview_id = bi.interview_id
 LEFT JOIN majorevents_check     me ON me.interview_id = bi.interview_id
 LEFT JOIN change_check          ch ON ch.interview_id = bi.interview_id
 LEFT JOIN hi_update_check       hi ON hi.interview_id = bi.interview_id

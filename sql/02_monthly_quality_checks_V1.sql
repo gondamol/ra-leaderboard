@@ -4,7 +4,7 @@
    INCLUDED CHECKS:
      - CF01 health expense without HI link
      - CF02 sources/uses balance (>5% diff)
-     - CF03 in-kind value != 0
+     - CF03 in-kind value != 0 (exempt: repayment in kind)
      - CF04 paid-on-behalf = 0
      - CF10 unlinked M-Pesa
      - CF11 unlinked credit
@@ -333,6 +333,11 @@ cf02 AS (
 
 /* ---------------------------------------------------------------
    CF03: In-kind payment with non-zero value
+   
+   EXEMPTION: "Repayment in kind" cash flow type is allowed to have 
+   a non-zero value. This occurs when debts are repaid with goods/
+   services (e.g., shop credit repaid with bread). The value field 
+   represents the monetary worth of the in-kind repayment.
 --------------------------------------------------------------- */
 cf03 AS (
     SELECT
@@ -360,9 +365,13 @@ cf03 AS (
     JOIN base_interviews bi ON bi.interview_id = cf.interview_id
     WHERE cf.paid_with_option_id IN (149691)   -- In-kind (trade/goods/service)
       AND cf.value <> 0
-      -- Allow in-kind value for debt repayments (credit/loan repayment recorded in kind)
+      /* EXEMPTION: Allow in-kind value for debt repayments
+         - "Repayment in kind" cashflow type (e.g., shop credit repaid with bread)
+         - Any type/category involving credit, loan, or repayment
+         These legitimately have non-zero values representing the worth of repayment */
       AND NOT (
-            COALESCE(cf.category_name_l, '') REGEXP '(credit|loan|repay)'
+            COALESCE(cf.type_name_l, '') LIKE '%repayment in kind%'
+         OR COALESCE(cf.category_name_l, '') REGEXP '(credit|loan|repay)'
          OR COALESCE(cf.type_name_l, '')     REGEXP '(credit|loan|repay)'
       )
 ),
