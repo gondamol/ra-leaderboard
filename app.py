@@ -40,8 +40,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 DATA_DIR = SCRIPT_DIR / "data"
 SQL_DIR = SCRIPT_DIR / "sql"
 MANUAL_SCORES_FILE = DATA_DIR / "manual_scores.json"
-CACHED_DATA_FILE = DATA_DIR / "cached_leaderboard.csv"
-CACHED_QUALITY_FILE = DATA_DIR / "cached_quality_issues.csv"
+# Note: Cache files are now per-month, using get_cached_data_path(month_key) and get_cached_quality_path(month_key)
 
 # SQL files - use the PARENT scripts directly
 SQL_COMPLETION_FILE = SQL_DIR / "01_monthly_completion_checks.sql"
@@ -488,28 +487,44 @@ def fetch_all_metrics(start_date: str, end_date: str) -> pd.DataFrame:
     return result
 
 
-def load_cached_data() -> pd.DataFrame:
-    if CACHED_DATA_FILE.exists():
-        return pd.read_csv(CACHED_DATA_FILE)
+def get_cached_data_path(month_key: str) -> Path:
+    """Get the cache file path for a specific month."""
+    return DATA_DIR / f"cached_leaderboard_{month_key}.csv"
+
+
+def get_cached_quality_path(month_key: str) -> Path:
+    """Get the quality cache file path for a specific month."""
+    return DATA_DIR / f"cached_quality_{month_key}.csv"
+
+
+def load_cached_data(month_key: str) -> pd.DataFrame:
+    """Load cached leaderboard data for a specific month."""
+    cache_path = get_cached_data_path(month_key)
+    if cache_path.exists():
+        return pd.read_csv(cache_path)
     return pd.DataFrame()
 
 
-def save_cached_data(df: pd.DataFrame):
+def save_cached_data(df: pd.DataFrame, month_key: str):
+    """Save leaderboard data to monthly cache file."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    df.to_csv(CACHED_DATA_FILE, index=False)
+    cache_path = get_cached_data_path(month_key)
+    df.to_csv(cache_path, index=False)
 
 
-def load_cached_quality() -> pd.DataFrame:
-    """Load cached quality issues data."""
-    if CACHED_QUALITY_FILE.exists():
-        return pd.read_csv(CACHED_QUALITY_FILE)
+def load_cached_quality(month_key: str) -> pd.DataFrame:
+    """Load cached quality issues data for a specific month."""
+    cache_path = get_cached_quality_path(month_key)
+    if cache_path.exists():
+        return pd.read_csv(cache_path)
     return pd.DataFrame()
 
 
-def save_cached_quality(df: pd.DataFrame):
-    """Save quality issues data to cache."""
+def save_cached_quality(df: pd.DataFrame, month_key: str):
+    """Save quality issues data to monthly cache file."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    df.to_csv(CACHED_QUALITY_FILE, index=False)
+    cache_path = get_cached_quality_path(month_key)
+    df.to_csv(cache_path, index=False)
 
 
 def load_manual_scores() -> dict:
@@ -1182,14 +1197,53 @@ def main():
     with st.sidebar:
         st.markdown("### ⚙️ Settings")
         today = datetime.now()
-        year = st.selectbox("Year", [2024, 2025], index=1)
-        month = st.selectbox("Month", list(range(1, 13)), index=today.month - 1,
+        
+        # Project timeline:
+        # - Baseline started: August 2025
+        # - Diaries started: October 2025
+        # Available years based on project timeline
+        available_years = [2025, 2026]
+        
+        # Default to the most recent complete month with data
+        # If we're in early January or any new month, default to previous month
+        # which would be December of previous year if we're in January
+        if today.month == 1:
+            # January - default to December of previous year
+            default_year = today.year - 1
+            default_month = 12
+        else:
+            # Any other month - default to previous month of current year
+            default_year = today.year
+            default_month = today.month - 1
+        
+        # Ensure default year is in available years
+        if default_year not in available_years:
+            default_year = available_years[-1]  # Use most recent available year
+        
+        year_index = available_years.index(default_year) if default_year in available_years else len(available_years) - 1
+        year = st.selectbox("Year", available_years, index=year_index)
+        
+        # Month selection - default to previous month (or Dec if we're in Jan)
+        month = st.selectbox("Month", list(range(1, 13)), index=default_month - 1,
                             format_func=lambda x: datetime(2000, x, 1).strftime('%B'))
         
         month_key = f"{year}_{month:02d}"
         month_name = datetime(year, month, 1).strftime("%B %Y")
         start_date, end_date = get_date_range(month, year)
         st.info(f"📅 {start_date} to {end_date}")
+        
+        # Data availability context
+        # Baseline: Aug 2025, Diaries: Oct 2025
+        selected_date = datetime(year, month, 1)
+        baseline_start = datetime(2025, 8, 1)
+        diaries_start = datetime(2025, 10, 1)
+        
+        if selected_date < baseline_start:
+            st.warning("⚠️ No data before August 2025 (project start)")
+        elif selected_date < diaries_start:
+            st.caption("ℹ️ Baseline period only (Aug-Sep 2025)")
+        elif selected_date > datetime.now():
+            st.caption("ℹ️ Future month - no data yet")
         
         # Only show refresh button when database is available (local mode)
         if DB_REFRESH_ENABLED:
@@ -1198,13 +1252,13 @@ def main():
                     df = fetch_all_metrics(start_date, end_date)
                     if not df.empty:
                         df = calculate_scores(df)
-                        save_cached_data(df)
+                        save_cached_data(df, month_key)
                         
                         # Also fetch quality data for the issues analysis tab
                         quality_df = run_sql_file(SQL_QUALITY_FILE, start_date, end_date, "Quality Issues")
                         if not quality_df.empty:
-                            save_cached_quality(quality_df)
-                        st.session_state['quality_df'] = quality_df
+                            save_cached_quality(quality_df, month_key)
+                        st.session_state[f'quality_df_{month_key}'] = quality_df
                         
                         st.success(f"✅ Loaded {len(df)} RAs")
                         st.rerun()
@@ -1234,16 +1288,31 @@ def main():
         
         is_admin = st.session_state.is_admin
     
-    df = load_cached_data()
+    df = load_cached_data(month_key)
     manual_scores = load_manual_scores()
-    # Load quality data from session state or cached file
-    quality_df = st.session_state.get('quality_df', None)
-    if quality_df is None or quality_df.empty:
-        quality_df = load_cached_quality()
+    # Load quality data from session state or cached file (month-specific)
+    quality_session_key = f'quality_df_{month_key}'
+    quality_df = st.session_state.get(quality_session_key, None)
+    if quality_df is None or (isinstance(quality_df, pd.DataFrame) and quality_df.empty):
+        quality_df = load_cached_quality(month_key)
     
     if df.empty:
-        st.markdown(f'<div class="header-container"><h1>🏆 RA of the Month</h1><p>| {month_name}</p></div>', unsafe_allow_html=True)
-        st.warning("No data available. Click 'Refresh from Database' in the sidebar.")
+        st.markdown(f'<div class="header-container"><h1>🏆 RA Performance Dashboard</h1><p>| {month_name}</p></div>', unsafe_allow_html=True)
+        
+        # Provide context-aware message for empty data
+        selected_date = datetime(year, month, 1)
+        baseline_start = datetime(2025, 8, 1)
+        diaries_start = datetime(2025, 10, 1)
+        current_date = datetime.now()
+        
+        if selected_date < baseline_start:
+            st.info("📋 **No data available for this period**\n\nThe project started in August 2025. Please select a month from August 2025 onwards.")
+        elif selected_date > current_date:
+            st.info(f"📋 **No data available for {month_name}**\n\nThis is a future month. Data will be available once interviews are conducted.")
+        elif selected_date >= datetime(current_date.year, current_date.month, 1):
+            st.info(f"📋 **{month_name} is the current month**\n\nData is still being collected. Check back later or refresh from database to see partial data.")
+        else:
+            st.warning("📋 **No cached data available**\n\nClick 'Refresh from Database' in the sidebar to load data for this month.")
         return
     
     if 'schedule_score' not in df.columns:

@@ -13,7 +13,7 @@ A monthly performance tracking dashboard for Research Assistants (RAs) in the He
 
 ```bash
 pip install -r requirements.txt
-streamlit run app.py
+python -m streamlit run app.py --server.port 8520
 ```
 
 ## Contact
