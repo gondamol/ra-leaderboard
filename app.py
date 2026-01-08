@@ -26,6 +26,28 @@ try:
 except ImportError:
     DB_AVAILABLE = False
 
+# Supabase for cloud storage of manual scores
+try:
+    from supabase import create_client, Client
+    SUPABASE_AVAILABLE = True
+except ImportError:
+    SUPABASE_AVAILABLE = False
+    
+# Initialize Supabase client (if configured)
+def get_supabase_client() -> 'Client | None':
+    """Get Supabase client if configured, otherwise return None."""
+    if not SUPABASE_AVAILABLE:
+        return None
+    try:
+        # Try Streamlit secrets first
+        if hasattr(st, 'secrets') and 'supabase' in st.secrets:
+            url = st.secrets["supabase"]["url"]
+            key = st.secrets["supabase"]["key"]
+            return create_client(url, key)
+    except Exception:
+        pass
+    return None
+
 # --------------------------------------------------------------------
 # Configuration
 # --------------------------------------------------------------------
@@ -572,6 +594,33 @@ def save_cached_quality(df: pd.DataFrame, month_key: str):
 
 
 def load_manual_scores() -> dict:
+    """
+    Load manual scores from Supabase (if available) or local JSON file.
+    Returns dict: {month_key: {ra_name: {journal: x, feedback: y, team: z}}}
+    """
+    # Try Supabase first
+    supabase = get_supabase_client()
+    if supabase:
+        try:
+            response = supabase.table('manual_scores').select('*').execute()
+            if response.data:
+                # Convert from database rows to nested dict format
+                scores = {}
+                for row in response.data:
+                    month_key = row['month_key']
+                    ra_name = row['ra_name']
+                    if month_key not in scores:
+                        scores[month_key] = {}
+                    scores[month_key][ra_name] = {
+                        'journal': row.get('journal_score', 0),
+                        'feedback': row.get('feedback_score', 0),
+                        'team': row.get('team_score', 0)
+                    }
+                return scores
+        except Exception as e:
+            st.sidebar.warning(f"⚠️ Supabase read error: {str(e)[:50]}")
+    
+    # Fallback to local JSON
     if MANUAL_SCORES_FILE.exists():
         with open(MANUAL_SCORES_FILE, 'r') as f:
             return json.load(f)
@@ -579,10 +628,37 @@ def load_manual_scores() -> dict:
 
 
 def save_manual_scores(scores: dict):
-    """Save manual scores to JSON file for persistence."""
+    """
+    Save manual scores to Supabase (if available) and local JSON file.
+    scores format: {month_key: {ra_name: {journal: x, feedback: y, team: z}}}
+    """
+    # Always save to local JSON as backup
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     with open(MANUAL_SCORES_FILE, 'w') as f:
         json.dump(scores, f, indent=2)
+    
+    # Try to save to Supabase
+    supabase = get_supabase_client()
+    if supabase:
+        try:
+            # Convert nested dict to database rows and upsert
+            for month_key, ra_scores in scores.items():
+                for ra_name, score_data in ra_scores.items():
+                    row = {
+                        'month_key': month_key,
+                        'ra_name': ra_name,
+                        'journal_score': score_data.get('journal', 0),
+                        'feedback_score': score_data.get('feedback', 0),
+                        'team_score': score_data.get('team', 0),
+                        'updated_at': datetime.now().isoformat()
+                    }
+                    # Upsert (insert or update on conflict)
+                    supabase.table('manual_scores').upsert(
+                        row, 
+                        on_conflict='month_key,ra_name'
+                    ).execute()
+        except Exception as e:
+            st.sidebar.error(f"⚠️ Supabase save error: {str(e)[:50]}")
 
 
 def load_all_quality_trend_data() -> pd.DataFrame:
