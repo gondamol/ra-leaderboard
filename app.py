@@ -126,7 +126,7 @@ ISSUE_CATEGORY_DEFINITIONS = {
         "short": "Payment not linked to cashflow",
         "description": "M-Pesa, bank, shop credit, or debit transactions that weren't linked to a corresponding cashflow entry. Every financial device transaction should be recorded as a cashflow."
     },
-    "Income/Expense Imbalance": {
+    "Sources/Uses Imbalance": {
         "short": "Sources don't match uses",
         "description": "Total income (sources) and total expenditure (uses) differ by more than 5%. This indicates missing cashflows or recording errors."
     },
@@ -634,7 +634,7 @@ def load_all_quality_trend_data() -> pd.DataFrame:
                         if 'not linked' in desc_lower or 'unlinked' in desc_lower:
                             return 'Unlinked Transactions'
                         elif 'imbalance' in desc_lower:
-                            return 'Income/Expense Imbalance'
+                            return 'Sources/Uses Imbalance'
                         elif 'cash on hand' in desc_lower:
                             return 'Cash Balance Missing'
                         elif 'in-kind' in desc_lower:
@@ -1311,7 +1311,7 @@ def render_quality_issues(quality_df: pd.DataFrame, month_name: str):
 | Category | What It Means |
 |----------|---------------|
 | **Unlinked Transactions** | M-Pesa, bank, or shop credit transactions not linked to a corresponding cashflow |
-| **Income/Expense Imbalance** | Total income (sources) and expenditure (uses) differ by more than 5% |
+| **Sources/Uses Imbalance** | Total income (sources) and expenditure (uses) differ by more than 5% |
 | **Cash Balance Missing** | Adult household members (18+) without recorded cash-on-hand |
 | **In-Kind Recording Issues** | Non-cash transactions missing descriptions or with incorrect values |
 | **Outdated Transactions** | Cashflows dated more than 21 days before the interview |
@@ -1332,7 +1332,7 @@ def render_quality_issues(quality_df: pd.DataFrame, month_name: str):
             if 'not linked' in desc_lower or 'unlinked' in desc_lower or 'linking' in desc_lower:
                 return 'Unlinked Transactions'
             elif 'imbalance' in desc_lower or 'source' in desc_lower and 'use' in desc_lower:
-                return 'Income/Expense Imbalance'
+                return 'Sources/Uses Imbalance'
             elif 'cash on hand' in desc_lower or 'cash-on-hand' in desc_lower:
                 return 'Cash Balance Missing'
             elif 'in-kind' in desc_lower or 'in kind' in desc_lower:
