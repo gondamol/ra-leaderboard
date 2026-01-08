@@ -113,14 +113,58 @@ ADMIN_PASSWORD = get_admin_password()
 
 # Comprehensive scoring rubric
 RUBRIC = {
-    "schedule": {"title": "Two-week Schedule", "automated": True},
+    "schedule": {"title": "Interview Scheduling", "automated": True},
     "quality": {"title": "Data Quality", "automated": True},
     "journal": {"title": "Journal Quality", "automated": False},
     "feedback": {"title": "Responsive to Feedback", "automated": False},
-    "team": {"title": "Team Contributions", "automated": False}
+    "team": {"title": "Team Participation", "automated": False}
 }
 
-# Quality Issues Reference
+# Issue Category Definitions - Clear explanations for dashboard users
+ISSUE_CATEGORY_DEFINITIONS = {
+    "Unlinked Transactions": {
+        "short": "Payment not linked to cashflow",
+        "description": "M-Pesa, bank, shop credit, or debit transactions that weren't linked to a corresponding cashflow entry. Every financial device transaction should be recorded as a cashflow."
+    },
+    "Income/Expense Imbalance": {
+        "short": "Sources don't match uses",
+        "description": "Total income (sources) and total expenditure (uses) differ by more than 5%. This indicates missing cashflows or recording errors."
+    },
+    "Cash Balance Missing": {
+        "short": "No cash-on-hand recorded",
+        "description": "Adult household members (18+) should have their current cash-on-hand recorded at each interview. Missing entries may indicate incomplete data collection."
+    },
+    "In-Kind Recording Issues": {
+        "short": "Non-cash transaction problems",
+        "description": "In-kind transactions (goods/services exchanged without cash) are missing required descriptions or have incorrect value entries."
+    },
+    "Outdated Transactions": {
+        "short": "Cashflows older than 21 days",
+        "description": "Cashflows dated more than 21 days before the interview are flagged as potentially stale or from the wrong interview period."
+    },
+    "Health Record Issues": {
+        "short": "Health data incomplete",
+        "description": "Health-related issues: medicine purchases not linked to health issues, medicine names not recorded, or health issue updates missing."
+    },
+    "Pregnancy Tracking Issues": {
+        "short": "Pregnancy data problems",
+        "description": "Issues with pregnancy tracking: duplicates, improperly closed pregnancies, pregnancies incorrectly marked as dormant, or missing forms."
+    },
+    "Provider Visit Issues": {
+        "short": "Healthcare visit incomplete",
+        "description": "When a household member reports visiting a healthcare provider, the provider visit form should be completed with details."
+    },
+    "Missing Forms/Updates": {
+        "short": "Required forms not completed",
+        "description": "Mandatory forms such as health issue updates, member departure forms, or VSLA/ROSCA activity forms were not completed."
+    },
+    "Other Data Issues": {
+        "short": "Miscellaneous data problems",
+        "description": "Other data quality issues not categorized above, such as contextual outliers or unusual patterns."
+    }
+}
+
+# Quality Issues Reference (detailed codes)
 QUALITY_ISSUES = {
     "Cashflow Issues (CF)": [
         {"code": "CF01", "desc": "Health expense without HI link"},
@@ -535,7 +579,10 @@ def load_manual_scores() -> dict:
 
 
 def save_manual_scores(scores: dict):
+    """Save manual scores to JSON file for persistence."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(MANUAL_SCORES_FILE, 'w') as f:
+        json.dump(scores, f, indent=2)
 
 
 def load_all_quality_trend_data() -> pd.DataFrame:
@@ -585,23 +632,23 @@ def load_all_quality_trend_data() -> pd.DataFrame:
                     def categorize_issue(desc):
                         desc_lower = str(desc).lower()
                         if 'not linked' in desc_lower or 'unlinked' in desc_lower:
-                            return 'Linking Issues'
+                            return 'Unlinked Transactions'
                         elif 'imbalance' in desc_lower:
-                            return 'Balance Issues'
+                            return 'Income/Expense Imbalance'
                         elif 'cash on hand' in desc_lower:
-                            return 'Cash on Hand'
+                            return 'Cash Balance Missing'
                         elif 'in-kind' in desc_lower:
-                            return 'In-Kind Issues'
+                            return 'In-Kind Recording Issues'
                         elif '21 days' in desc_lower:
-                            return 'Old Cashflows'
+                            return 'Outdated Transactions'
                         elif 'medicine' in desc_lower or 'health' in desc_lower:
-                            return 'Health Issues'
+                            return 'Health Record Issues'
                         elif 'pregnancy' in desc_lower:
-                            return 'Pregnancy Issues'
+                            return 'Pregnancy Tracking Issues'
                         elif 'm-pesa' in desc_lower or 'mpesa' in desc_lower:
-                            return 'M-Pesa Issues'
+                            return 'Unlinked Transactions'  # M-Pesa falls under linking
                         else:
-                            return 'Other'
+                            return 'Other Data Issues'
                     
                     df['issue_category'] = df[issue_col].apply(categorize_issue)
                 else:
@@ -1258,6 +1305,22 @@ def render_quality_issues(quality_df: pd.DataFrame, month_name: str):
     
     st.markdown(f"**Total Issues Found:** {len(filtered_df)}")
     
+    # Add definitions legend as an expander
+    with st.expander("📖 **Issue Category Definitions** (click to expand)"):
+        st.markdown("""
+| Category | What It Means |
+|----------|---------------|
+| **Unlinked Transactions** | M-Pesa, bank, or shop credit transactions not linked to a corresponding cashflow |
+| **Income/Expense Imbalance** | Total income (sources) and expenditure (uses) differ by more than 5% |
+| **Cash Balance Missing** | Adult household members (18+) without recorded cash-on-hand |
+| **In-Kind Recording Issues** | Non-cash transactions missing descriptions or with incorrect values |
+| **Outdated Transactions** | Cashflows dated more than 21 days before the interview |
+| **Health Record Issues** | Medicine purchases not linked to health issues, or incomplete health data |
+| **Pregnancy Tracking Issues** | Duplicates, improperly closed, or dormant pregnancies |
+| **Missing Forms/Updates** | Required forms (health updates, member departures) not completed |
+| **Other Data Issues** | Miscellaneous data quality issues |
+        """)
+    
     if len(filtered_df) == 0:
         st.success("✅ No quality issues for this selection!")
         return
@@ -1267,27 +1330,27 @@ def render_quality_issues(quality_df: pd.DataFrame, month_name: str):
         def categorize_issue(desc):
             desc_lower = str(desc).lower()
             if 'not linked' in desc_lower or 'unlinked' in desc_lower or 'linking' in desc_lower:
-                return 'Transactions Not Linked'
+                return 'Unlinked Transactions'
             elif 'imbalance' in desc_lower or 'source' in desc_lower and 'use' in desc_lower:
-                return 'Source/Use Imbalance'
+                return 'Income/Expense Imbalance'
             elif 'cash on hand' in desc_lower or 'cash-on-hand' in desc_lower:
-                return 'Cash on Hand Missing'
+                return 'Cash Balance Missing'
             elif 'in-kind' in desc_lower or 'in kind' in desc_lower:
-                return 'In-Kind Issues'
+                return 'In-Kind Recording Issues'
             elif '21 days' in desc_lower or 'old' in desc_lower:
-                return 'Old Transactions'
+                return 'Outdated Transactions'
             elif 'medicine' in desc_lower or 'health' in desc_lower:
-                return 'Health/Medicine Issues'
+                return 'Health Record Issues'
             elif 'pregnancy' in desc_lower:
-                return 'Pregnancy Issues'
+                return 'Pregnancy Tracking Issues'
             elif 'update' in desc_lower or 'form' in desc_lower:
                 return 'Missing Forms/Updates'
             elif 'mpesa' in desc_lower or 'm-pesa' in desc_lower:
-                return 'M-Pesa Issues'
+                return 'Unlinked Transactions'
             elif 'credit' in desc_lower or 'shop' in desc_lower:
-                return 'Credit/Shop Issues'
+                return 'Unlinked Transactions'
             else:
-                return 'Other Issues'
+                return 'Other Data Issues'
         
         filtered_df['issue_category'] = filtered_df[issue_col].apply(categorize_issue)
     
