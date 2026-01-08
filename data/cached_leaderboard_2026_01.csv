@@ -1,0 +1,11 @@
+ra_name,total_interviews,complete_count,pct_complete,interviews_with_issues,pct_no_quality_flags,interviews_with_imbalance,pct_lt5pct_imbalance,total_cfs,total_answers,avg_answers,pct_within_14_16_days,schedule_score,quality_score,completion_score
+abi,6,5,83,2,67,0,100,600,1982,330,0,1,1,4
+ann,5,5,100,2,60,0,100,437,1271,254,0,1,1,5
+bilha,5,5,100,1,80,0,100,741,1619,324,0,1,2,5
+faith,5,5,100,0,100,0,100,344,1008,202,0,1,5,5
+fardosa,5,3,60,2,60,0,100,463,1085,217,0,1,1,2
+gideon,5,5,100,3,40,0,100,291,765,153,0,1,1,5
+josephine,6,6,100,1,83,1,83,676,1565,261,0,1,2,5
+joyce,5,2,40,5,0,2,60,540,1409,282,0,1,1,1
+kiti,5,2,40,3,40,2,60,689,1472,294,0,1,1,1
+nema,6,4,67,1,83,0,100,501,1294,216,0,1,2,2

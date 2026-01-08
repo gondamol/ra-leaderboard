@@ -182,7 +182,7 @@ ISSUE_CATEGORY_DEFINITIONS = {
     },
     "Other Data Issues": {
         "short": "Miscellaneous data problems",
-        "description": "Other data quality issues not categorized above, such as contextual outliers or unusual patterns."
+        "description": "Other data quality issues not categorized above (e.g., contextual outliers, suspiciously high/low amounts, data entry anomalies, missing airtime purchases, unusual transaction patterns)."
     }
 }
 
@@ -978,10 +978,8 @@ def render_data_summary(df: pd.DataFrame, month_name: str):
                 view_options = ['📊 Team Overview'] + all_ras
                 selected_view = st.selectbox("View", view_options, key="trend_ra_filter")
             
-            # Layout: Chart takes most space, small summary on right
-            trend_viz_col1, trend_viz_col2 = st.columns([3, 1])
-            
-            with trend_viz_col1:
+            # Layout: Chart takes full width (removed comparison cards per user request)
+            with st.container():
                 if selected_view == '📊 Team Overview':
                     # Team Overview: Show ONLY team average line (clean view)
                     # Calculate team average per month
@@ -994,9 +992,9 @@ def render_data_summary(df: pd.DataFrame, month_name: str):
                     fig.add_scatter(
                         x=team_avg['month_short'],
                         y=team_avg['issue_count'],
-                        mode='lines+markers',
                         name='Team Average',
-                        line=dict(width=4, color='#667eea'),
+                        mode='lines+markers',
+                        line=dict(color='#667eea', width=3),
                         marker=dict(size=12),
                         hovertemplate='%{x}<br>Avg Issues: %{y:.1f}<extra></extra>'
                     )
@@ -1031,104 +1029,6 @@ def render_data_summary(df: pd.DataFrame, month_name: str):
                     fig.update_traces(line_width=3, marker_size=10, line_color='#667eea')
                 
                 st.plotly_chart(fig, use_container_width=True)
-            
-            with trend_viz_col2:
-                # Condensed Monthly Change - Top 2 improvers & Top 2 needing attention
-                if len(month_order) >= 2:
-                    current_month = month_order[-1]
-                    prev_month = month_order[-2]
-                    
-                    current_data = total_trend[total_trend['month_short'] == current_month]
-                    prev_data = total_trend[total_trend['month_short'] == prev_month]
-                    
-                    # Calculate changes for all RAs
-                    changes = []
-                    for _, row in current_data.iterrows():
-                        ra = row['ra_name']
-                        current_issues = row['issue_count']
-                        prev_issues_arr = prev_data[prev_data['ra_name'] == ra]['issue_count'].values
-                        prev_issues = prev_issues_arr[0] if len(prev_issues_arr) > 0 else current_issues
-                        
-                        change = current_issues - prev_issues
-                        changes.append({'ra': ra, 'current': current_issues, 'prev': prev_issues, 'change': change})
-                    
-                    changes_df = pd.DataFrame(changes).sort_values('change')
-                    
-                    # Top 2 Improvers (biggest decrease = most negative change)
-                    st.markdown("**✅ Most Improved**")
-                    improvers = changes_df.head(2)
-                    for _, r in improvers.iterrows():
-                        if r['change'] < 0:
-                            st.markdown(f"<div style='background:#d4edda; padding:8px; border-radius:5px; margin:4px 0;'>"
-                                       f"<b>{r['ra']}</b><br>"
-                                       f"<span style='color:#155724; font-size:0.9em;'>{int(r['current'])} issues ({int(r['change']):+d})</span>"
-                                       f"</div>", unsafe_allow_html=True)
-                        else:
-                            st.markdown(f"<div style='background:#f8f9fa; padding:8px; border-radius:5px; margin:4px 0;'>"
-                                       f"<b>{r['ra']}</b><br>"
-                                       f"<span style='font-size:0.9em;'>{int(r['current'])} issues</span>"
-                                       f"</div>", unsafe_allow_html=True)
-                    
-                    st.markdown("")  # Spacer
-                    
-                    # Needs Focus: Only show RAs who actually had an INCREASE in issues
-                    st.markdown("**⚠️ Needs Focus**")
-                    # Filter to only RAs with increased issues
-                    ras_with_increase = changes_df[changes_df['change'] > 0].sort_values('change', ascending=False)
-                    
-                    if len(ras_with_increase) > 0:
-                        # Show up to 2 RAs with biggest increase
-                        for _, r in ras_with_increase.head(2).iterrows():
-                            st.markdown(f"<div style='background:#f8d7da; padding:8px; border-radius:5px; margin:4px 0;'>"
-                                       f"<b>{r['ra']}</b><br>"
-                                       f"<span style='color:#721c24; font-size:0.9em;'>{int(r['current'])} issues ({int(r['change']):+d})</span>"
-                                       f"</div>", unsafe_allow_html=True)
-                    else:
-                        # Everyone improved! Show celebratory message
-                        st.markdown(f"<div style='background:#d4edda; padding:8px; border-radius:5px; margin:4px 0;'>"
-                                   f"<span style='color:#155724;'>🎉 All RAs improved!</span>"
-                                   f"</div>", unsafe_allow_html=True)
-                else:
-                    st.info("Need 2+ months for comparison")
-            
-            # Issue Category Breakdown
-            st.markdown("#### 🔍 Issue Types Breakdown")
-            
-            # Get category breakdown for latest month
-            if month_order:
-                latest_month_full = total_trend[total_trend['month_short'] == month_order[-1]]['month'].values[0]
-                category_data = trend_data[
-                    (trend_data['month'] == latest_month_full) & 
-                    (trend_data['issue_category'] != 'Total')
-                ]
-                
-                if not category_data.empty:
-                    # Pivot for heatmap
-                    pivot_data = category_data.pivot_table(
-                        index='ra_name', 
-                        columns='issue_category', 
-                        values='issue_count', 
-                        fill_value=0,
-                        aggfunc='sum'
-                    )
-                    
-                    fig = go.Figure(data=go.Heatmap(
-                        z=pivot_data.values,
-                        x=pivot_data.columns.tolist(),
-                        y=pivot_data.index.tolist(),
-                        colorscale='RdYlGn_r',
-                        text=pivot_data.values,
-                        texttemplate="%{text}",
-                        textfont={"size": 11},
-                        hovertemplate="RA: %{y}<br>Category: %{x}<br>Count: %{z}<extra></extra>"
-                    ))
-                    fig.update_layout(
-                        title=f"Issue Types by RA - {month_order[-1]}",
-                        height=max(300, len(pivot_data) * 35),
-                        xaxis_title="",
-                        yaxis_title=""
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("📊 Quality trend data will appear once you have multiple months of cached data.")
     
@@ -1381,21 +1281,13 @@ def render_quality_issues(quality_df: pd.DataFrame, month_name: str):
     
     st.markdown(f"**Total Issues Found:** {len(filtered_df)}")
     
-    # Add definitions legend as an expander
+    # Add definitions legend as an expander - uses ISSUE_CATEGORY_DEFINITIONS dictionary
     with st.expander("📖 **Issue Category Definitions** (click to expand)"):
-        st.markdown("""
-| Category | What It Means |
-|----------|---------------|
-| **Unlinked Transactions** | M-Pesa, bank, or shop credit transactions not linked to a corresponding cashflow |
-| **Sources/Uses Imbalance** | Total income (sources) and expenditure (uses) differ by more than 5% |
-| **Cash Balance Missing** | Adult household members (18+) without recorded cash-on-hand |
-| **In-Kind Recording Issues** | Non-cash transactions missing descriptions or with incorrect values |
-| **Outdated Transactions** | Cashflows dated more than 21 days before the interview |
-| **Health Record Issues** | Medicine purchases not linked to health issues, or incomplete health data |
-| **Pregnancy Tracking Issues** | Duplicates, improperly closed, or dormant pregnancies |
-| **Missing Forms/Updates** | Required forms (health updates, member departures) not completed |
-| **Other Data Issues** | Miscellaneous data quality issues |
-        """)
+        # Build the markdown table dynamically from the dictionary
+        table_md = "| Category | What It Means |\n|----------|---------------|\n"
+        for category, info in ISSUE_CATEGORY_DEFINITIONS.items():
+            table_md += f"| **{category}** | {info['description']} |\n"
+        st.markdown(table_md)
     
     if len(filtered_df) == 0:
         st.success("✅ No quality issues for this selection!")
@@ -1676,25 +1568,31 @@ def main():
         elif selected_date > datetime.now():
             st.caption("ℹ️ Future month - no data yet")
         
-        # Only show refresh button when database is available (local mode)
-        if DB_REFRESH_ENABLED:
+        # Show refresh button when NOT on Streamlit Cloud
+        # Re-check database availability when button is clicked (not just at startup)
+        if not IS_CLOUD_ENV:
             if st.button("🔄 Refresh from Database", type="primary", use_container_width=True):
-                with st.spinner("Running SQL scripts..."):
-                    df = fetch_all_metrics(start_date, end_date)
-                    if not df.empty:
-                        df = calculate_scores(df)
-                        save_cached_data(df, month_key)
-                        
-                        # Also fetch quality data for the issues analysis tab
-                        quality_df = run_sql_file(SQL_QUALITY_FILE, start_date, end_date, "Quality Issues")
-                        if not quality_df.empty:
-                            save_cached_quality(quality_df, month_key)
-                        st.session_state[f'quality_df_{month_key}'] = quality_df
-                        
-                        st.success(f"✅ Loaded {len(df)} RAs")
-                        st.rerun()
-                    else:
-                        st.error("Could not fetch data from database.")
+                # Re-check if database is available now (it might have been started after app launch)
+                db_available_now = DB_AVAILABLE and _is_db_reachable()
+                if not db_available_now:
+                    st.error("❌ Database not reachable. Please ensure MySQL is running on localhost:3306.")
+                else:
+                    with st.spinner("Running SQL scripts..."):
+                        df = fetch_all_metrics(start_date, end_date)
+                        if not df.empty:
+                            df = calculate_scores(df)
+                            save_cached_data(df, month_key)
+                            
+                            # Also fetch quality data for the issues analysis tab
+                            quality_df = run_sql_file(SQL_QUALITY_FILE, start_date, end_date, "Quality Issues")
+                            if not quality_df.empty:
+                                save_cached_quality(quality_df, month_key)
+                            st.session_state[f'quality_df_{month_key}'] = quality_df
+                            
+                            st.success(f"✅ Loaded {len(df)} RAs")
+                            st.rerun()
+                        else:
+                            st.error("Could not fetch data from database.")
         
         st.divider()
         st.markdown("### 🔐 Admin Access")

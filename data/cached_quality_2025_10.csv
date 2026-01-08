@@ -117,14 +117,13 @@ KHOMA22,Scovia,2025-10-01 12:20:00,josephine,,,Adult (18+) without cash on hand 
 KHOMA22,Daniel,2025-10-01 12:20:00,josephine,,,Adult (18+) without cash on hand balance: Daniel (age 36),,,,,,,,
 KHOMA23,Mary,2025-10-02 13:00:00,josephine,,,Adult (18+) without cash on hand balance: Mary (age 37),,,,,,,,
 KHOMA23,Mary,2025-10-15 14:11:00,josephine,,,"Source/Use imbalance: Sources KSh 1,320, Uses KSh 1,470 (Difference: 11.4%%)",,,,,,1320.0,1470.0,11.4
-KHOMA27,Otange,2025-10-28 13:11:00,josephine,,,"Source/Use imbalance: Sources KSh 4,760, Uses KSh 7,540 (Difference: 58.4%%)",,,,,,4760.0,7540.0,58.4
 KHOMA28,Lukas,2025-10-02 12:30:00,josephine,,,Adult (18+) without cash on hand balance: Lukas (age 69),,,,,,,,
 KHOMA28,Peninnah,2025-10-02 12:30:00,josephine,,,Adult (18+) without cash on hand balance: Peninnah (age 41),,,,,,,,
 KHOMA28,Alfred,2025-10-02 12:30:00,josephine,,,Adult (18+) without cash on hand balance: Alfred (age 19),,,,,,,,
 KHOMA28,Lukas,2025-10-03 10:00:00,josephine,,,Adult (18+) without cash on hand balance: Lukas (age 69),,,,,,,,
 KHOMA28,Peninnah,2025-10-03 10:00:00,josephine,,,Adult (18+) without cash on hand balance: Peninnah (age 41),,,,,,,,
 KHOMA28,Alfred,2025-10-03 10:00:00,josephine,,,Adult (18+) without cash on hand balance: Alfred (age 19),,,,,,,,
-KHOMA29,Marine,2025-10-16 09:44:00,josephine,,,Said bought medicine but no medicine cashflow found - check for medicine/drug purchases,,,,,,,,
+KHOMA29,,2025-10-16 09:44:00,josephine,,,Said bought medicine but no medicine cashflow found - check for medicine/drug purchases,,,,,,,,
 KHOMA29,Marine,2025-10-16 09:44:00,josephine,,,Said bought medicine but no medicine cashflow found - check for medicine/drug purchases,,,,,,,,
 KHOMA29,Jairus,2025-10-31 13:15:00,josephine,,,M-Pesa transaction (KSh 20 for Mobile Money) not linked to matching cashflow,2025-10-15,20.0,Mobile Money,"3. Withdrawals, transfers, debits",02=M-Pesa / Mobile money,,,
 KHOMA29,Jairus,2025-10-31 13:15:00,josephine,,,M-Pesa transaction (KSh 20 for Mobile Money) not linked to matching cashflow,2025-10-22,20.0,Mobile Money,"3. Withdrawals, transfers, debits",02=M-Pesa / Mobile money,,,
@@ -538,7 +537,7 @@ KMIGR14,Lorna,2025-10-24 12:18:00,griffin,,,Adult (18+) without cash on hand bal
 KMIGR14,Washington,2025-10-24 12:18:00,griffin,,,Adult (18+) without cash on hand balance: Washington (age 80),,,,,,,,
 KMIGR15,Rose,2025-10-09 14:43:00,griffin,,,"Source/Use imbalance: Sources KSh 800, Uses KSh 1,940 (Difference: 142.5%%)",,,,,,800.0,1940.0,142.5
 KMIGR15,Rose,2025-10-09 14:43:00,griffin,,,"M-Pesa transaction (KSh 100 for Electricity, phone charging) not linked to matching cashflow",2025-10-06,100.0,"Electricity, phone charging",Payments,02=M-Pesa / Mobile money,,,
-KMIGR15,Rose,2025-10-09 14:43:00,griffin,,,Said visited provider but provider visit form missing for HI Hypertension-Rose,,,,,,,,
+KMIGR15,Rose,2025-10-09 14:43:00,griffin,,,Said visited provider but provider visit form missing for HI Hypertension-Rose - check Provider Visit or Chronic Illness Visit forms,,,,,,,,
 KMIGR15,Rose,2025-10-09 14:43:00,griffin,,,Adult (18+) without cash on hand balance: Rose (age 58),,,,,,,,
 KMIGR15,Austin,2025-10-09 14:43:00,griffin,,,Adult (18+) without cash on hand balance: Austin (age 19),,,,,,,,
 KMIGR15,Brian,2025-10-09 14:43:00,griffin,,,Adult (18+) without cash on hand balance: Brian (age 19),,,,,,,,
@@ -777,7 +776,6 @@ KNBOY15,Lucy,2025-10-04 07:59:00,joyce,,,Adult (18+) without cash on hand balanc
 KNBOY16,Purity,2025-10-14 09:37:00,joyce,,,Adult (18+) without cash on hand balance: Purity (age 21),,,,,,,,
 KNBOY21,Peter,2025-10-02 10:45:00,joyce,,,Adult (18+) without cash on hand balance: Peter (age 49),,,,,,,,
 KNBOY21,Catherine,2025-10-02 10:45:00,joyce,,,Adult (18+) without cash on hand balance: Catherine (age 51),,,,,,,,
-KNBOY21,James,2025-10-02 10:45:00,joyce,,,Adult (18+) without cash on hand balance: James (age 56),,,,,,,,
 KNBOY23,Simon,2025-10-01 08:58:00,joyce,,,Adult (18+) without cash on hand balance: Simon (age 41),,,,,,,,
 KNBOY23,Halima,2025-10-01 08:58:00,joyce,,,Adult (18+) without cash on hand balance: Halima (age 36),,,,,,,,
 KNBOY24,Mary sella,2025-10-08 13:21:00,joyce,,,Adult (18+) without cash on hand balance: Mary sella (age 45),,,,,,,,
