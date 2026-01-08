@@ -624,6 +624,11 @@ hi02 AS (
 
 /* ---------------------------------------------------------------
    HI03: Provider visit reported but no provider details
+   
+   UPDATED: Now also checks for chronic illness recurrent visit forms
+   (e.g., Diabetes, Hypertension therapy visits) which use question IDs:
+   604131 (form intro), 604125 (health issue selection), 604128 (facility),
+   604134 (provider type), 604137 (reason), 604140 (transport), etc.
 --------------------------------------------------------------- */
 hi_prov_visit AS (
     SELECT
@@ -636,6 +641,7 @@ hi_prov_visit AS (
       AND v.value = 1
 ),
 
+/* Regular provider visit form answers */
 hi_provider_detail AS (
     SELECT
         a.interview_id,
@@ -643,8 +649,36 @@ hi_provider_detail AS (
         MAX(CASE WHEN a.question_id = 599811 THEN 1 ELSE 0 END) AS has_hi_selection
     FROM answers a
     WHERE a.question_id IN (
+        -- Regular provider visit form questions
         599811, 600774, 600777, 600780, 600783, 600786, 600789,
         600816, 600822, 603300, 604071, 604110
+    )
+    GROUP BY a.interview_id
+),
+
+/* Chronic illness recurrent visit form answers
+   (RV Recurrent Visit - Chronic Illness Clinics or Therapy) */
+hi_chronic_visit AS (
+    SELECT
+        a.interview_id,
+        COUNT(*) AS chronic_detail_count,
+        MAX(CASE WHEN a.question_id = 604125 THEN 1 ELSE 0 END) AS has_chronic_hi_selection
+    FROM answers a
+    WHERE a.question_id IN (
+        -- Chronic illness recurrent visit form questions
+        604131,  -- Form header/intro
+        604125,  -- Which health issue is this for? (Diabetes, Hypertension, etc.)
+        604128,  -- Which facility/provider visited
+        604134,  -- What type of provider
+        604137,  -- Why did you choose this provider
+        604140,  -- How does member normally reach facility
+        604143,  -- Transport cost
+        604146,  -- Which medicines given
+        604149,  -- How long to reach facility
+        604152,  -- What normally happens during visit
+        604155,  -- How long does visit take
+        604158,  -- How much pay for visits
+        604161   -- Any notes about recurrent visit
     )
     GROUP BY a.interview_id
 ),
@@ -656,7 +690,9 @@ hi03 AS (
         COALESCE(m.name, hi.hi_name, '') AS member_name,
         bi.interview_start_date AS interview_time,
         bi.ra_name,
-        CONCAT('Said visited provider but provider visit form missing for HI ', COALESCE(hi.hi_name, '')) AS issue_description,
+        CONCAT('Said visited provider but provider visit form missing for HI ', 
+               COALESCE(hi.hi_name, ''), 
+               ' - check Provider Visit or Chronic Illness Visit forms') AS issue_description,
         NULL AS cashflow_date,
         NULL AS amount_ksh,
         NULL AS category_item,
@@ -668,10 +704,14 @@ hi03 AS (
     FROM hi_prov_visit hp
     JOIN base_interviews bi ON bi.interview_id = hp.interview_id
     LEFT JOIN hi_provider_detail hd ON hd.interview_id = hp.interview_id
+    LEFT JOIN hi_chronic_visit hcv ON hcv.interview_id = hp.interview_id
     LEFT JOIN health_issues hi ON hi.hi_id = hp.hi_id
     LEFT JOIN members m ON m.id = hi.member_id
+    /* Only flag if BOTH provider form AND chronic form are missing */
     WHERE COALESCE(hd.detail_count, 0) = 0
+      AND COALESCE(hcv.chronic_detail_count, 0) = 0
 ),
+
 
 /* ---------------------------------------------------------------
    HI04: Provider form present but missing HI selection

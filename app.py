@@ -536,6 +536,113 @@ def load_manual_scores() -> dict:
 
 def save_manual_scores(scores: dict):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def load_all_quality_trend_data() -> pd.DataFrame:
+    """
+    Load all cached quality data files and aggregate issue counts by RA and month.
+    Returns DataFrame with columns: month, ra_name, issue_count, issue_category
+    """
+    all_data = []
+    
+    # Find all cached quality files
+    quality_files = list(DATA_DIR.glob("cached_quality_*.csv"))
+    
+    for qf in quality_files:
+        # Extract month_key from filename (e.g., cached_quality_2025_12.csv -> 2025_12)
+        filename = qf.stem
+        if filename == 'cached_quality' or '_' not in filename:
+            continue  # Skip the old non-monthly file
+        
+        try:
+            # Parse month_key from filename: cached_quality_2025_12 -> 2025_12
+            parts = filename.replace('cached_quality_', '')
+            year_month = parts.split('_')
+            if len(year_month) >= 2:
+                year = int(year_month[0])
+                month = int(year_month[1])
+                month_label = datetime(year, month, 1).strftime('%b %Y')
+            else:
+                continue
+        except:
+            continue
+        
+        try:
+            df = pd.read_csv(qf)
+            df = normalize_columns(df)
+            
+            # Find RA column
+            ra_col = next((c for c in df.columns if 'ra' in c.lower() and 'name' in c.lower()), 
+                         next((c for c in df.columns if 'ra' in c.lower()), None))
+            issue_col = next((c for c in df.columns if 'issue' in c.lower() and 'desc' in c.lower()), None)
+            
+            if ra_col:
+                # Exclude non-RA users
+                df = df[~df[ra_col].str.lower().isin(['julie', 'cate'])]
+                
+                # Categorize issues for detailed breakdown
+                if issue_col:
+                    def categorize_issue(desc):
+                        desc_lower = str(desc).lower()
+                        if 'not linked' in desc_lower or 'unlinked' in desc_lower:
+                            return 'Linking Issues'
+                        elif 'imbalance' in desc_lower:
+                            return 'Balance Issues'
+                        elif 'cash on hand' in desc_lower:
+                            return 'Cash on Hand'
+                        elif 'in-kind' in desc_lower:
+                            return 'In-Kind Issues'
+                        elif '21 days' in desc_lower:
+                            return 'Old Cashflows'
+                        elif 'medicine' in desc_lower or 'health' in desc_lower:
+                            return 'Health Issues'
+                        elif 'pregnancy' in desc_lower:
+                            return 'Pregnancy Issues'
+                        elif 'm-pesa' in desc_lower or 'mpesa' in desc_lower:
+                            return 'M-Pesa Issues'
+                        else:
+                            return 'Other'
+                    
+                    df['issue_category'] = df[issue_col].apply(categorize_issue)
+                else:
+                    df['issue_category'] = 'Unknown'
+                
+                # Count issues per RA per category
+                for ra in df[ra_col].unique():
+                    ra_data = df[df[ra_col] == ra]
+                    
+                    # Total count
+                    all_data.append({
+                        'month': month_label,
+                        'month_order': f"{year:04d}_{month:02d}",
+                        'ra_name': str(ra).title(),
+                        'issue_count': len(ra_data),
+                        'issue_category': 'Total'
+                    })
+                    
+                    # By category
+                    for cat in ra_data['issue_category'].unique():
+                        cat_count = len(ra_data[ra_data['issue_category'] == cat])
+                        all_data.append({
+                            'month': month_label,
+                            'month_order': f"{year:04d}_{month:02d}",
+                            'ra_name': str(ra).title(),
+                            'issue_count': cat_count,
+                            'issue_category': cat
+                        })
+        except Exception as e:
+            continue
+    
+    if all_data:
+        result = pd.DataFrame(all_data)
+        # Sort by month_order to ensure chronological order
+        result = result.sort_values('month_order')
+        return result
+    return pd.DataFrame()
+
+
+def save_manual_scores_json(scores: dict):
+    """Save manual scores to JSON file."""
     with open(MANUAL_SCORES_FILE, 'w') as f:
         json.dump(scores, f, indent=2)
 
@@ -717,6 +824,191 @@ def render_data_summary(df: pd.DataFrame, month_name: str):
             )
             st.plotly_chart(fig, use_container_width=True)
     
+    # Quality Issues Trend Over Time
+    st.markdown("### 📈 Quality Issues Trend Over Time")
+    st.caption("Track improvements in quality over time — lower numbers mean fewer issues")
+    
+    trend_data = load_all_quality_trend_data()
+    
+    if not trend_data.empty:
+        # Filter for Total issues only for the main trend
+        total_trend = trend_data[trend_data['issue_category'] == 'Total'].copy()
+        
+        if not total_trend.empty:
+            # Create better month format: "Dec-25" instead of "Dec 2025"
+            def format_month_short(month_str):
+                try:
+                    dt = datetime.strptime(month_str, '%b %Y')
+                    return dt.strftime('%b-%y')  # "Dec-25"
+                except:
+                    return month_str
+            
+            total_trend['month_short'] = total_trend['month'].apply(format_month_short)
+            
+            # Create month order for proper sorting
+            month_order = total_trend[['month_short', 'month_order']].drop_duplicates().sort_values('month_order')['month_short'].tolist()
+            
+            # RA Filter - Team view or Individual
+            filter_col1, filter_col2 = st.columns([1, 3])
+            with filter_col1:
+                all_ras = sorted(total_trend['ra_name'].unique().tolist())
+                view_options = ['📊 Team Overview'] + all_ras
+                selected_view = st.selectbox("View", view_options, key="trend_ra_filter")
+            
+            # Layout: Chart takes most space, small summary on right
+            trend_viz_col1, trend_viz_col2 = st.columns([3, 1])
+            
+            with trend_viz_col1:
+                if selected_view == '📊 Team Overview':
+                    # Team Overview: Show ONLY team average line (clean view)
+                    # Calculate team average per month
+                    team_avg = total_trend.groupby(['month_short', 'month_order'])['issue_count'].mean().reset_index()
+                    team_avg['ra_name'] = 'Team Average'
+                    team_avg = team_avg.sort_values('month_order')
+                    
+                    # Create figure with only team average line
+                    fig = go.Figure()
+                    fig.add_scatter(
+                        x=team_avg['month_short'],
+                        y=team_avg['issue_count'],
+                        mode='lines+markers',
+                        name='Team Average',
+                        line=dict(width=4, color='#667eea'),
+                        marker=dict(size=12),
+                        hovertemplate='%{x}<br>Avg Issues: %{y:.1f}<extra></extra>'
+                    )
+                    
+                    fig.update_layout(
+                        height=380,
+                        hovermode='x unified',
+                        xaxis_title="Month",
+                        yaxis_title="Average Issues",
+                        xaxis=dict(categoryorder='array', categoryarray=month_order),
+                        showlegend=False
+                    )
+                else:
+                    # Individual RA view
+                    ra_data = total_trend[total_trend['ra_name'] == selected_view]
+                    
+                    fig = px.line(
+                        ra_data, 
+                        x='month_short', 
+                        y='issue_count', 
+                        markers=True,
+                        labels={'issue_count': 'Number of Issues', 'month_short': 'Month'},
+                        category_orders={'month_short': month_order}
+                    )
+                    fig.update_layout(
+                        height=380,
+                        title=f"{selected_view}'s Quality Trend",
+                        hovermode='x unified',
+                        xaxis_title="Month",
+                        yaxis_title="Issues"
+                    )
+                    fig.update_traces(line_width=3, marker_size=10, line_color='#667eea')
+                
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with trend_viz_col2:
+                # Condensed Monthly Change - Top 2 improvers & Top 2 needing attention
+                if len(month_order) >= 2:
+                    current_month = month_order[-1]
+                    prev_month = month_order[-2]
+                    
+                    current_data = total_trend[total_trend['month_short'] == current_month]
+                    prev_data = total_trend[total_trend['month_short'] == prev_month]
+                    
+                    # Calculate changes for all RAs
+                    changes = []
+                    for _, row in current_data.iterrows():
+                        ra = row['ra_name']
+                        current_issues = row['issue_count']
+                        prev_issues_arr = prev_data[prev_data['ra_name'] == ra]['issue_count'].values
+                        prev_issues = prev_issues_arr[0] if len(prev_issues_arr) > 0 else current_issues
+                        
+                        change = current_issues - prev_issues
+                        changes.append({'ra': ra, 'current': current_issues, 'prev': prev_issues, 'change': change})
+                    
+                    changes_df = pd.DataFrame(changes).sort_values('change')
+                    
+                    # Top 2 Improvers (biggest decrease = most negative change)
+                    st.markdown("**✅ Most Improved**")
+                    improvers = changes_df.head(2)
+                    for _, r in improvers.iterrows():
+                        if r['change'] < 0:
+                            st.markdown(f"<div style='background:#d4edda; padding:8px; border-radius:5px; margin:4px 0;'>"
+                                       f"<b>{r['ra']}</b><br>"
+                                       f"<span style='color:#155724; font-size:0.9em;'>{int(r['current'])} issues ({int(r['change']):+d})</span>"
+                                       f"</div>", unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"<div style='background:#f8f9fa; padding:8px; border-radius:5px; margin:4px 0;'>"
+                                       f"<b>{r['ra']}</b><br>"
+                                       f"<span style='font-size:0.9em;'>{int(r['current'])} issues</span>"
+                                       f"</div>", unsafe_allow_html=True)
+                    
+                    st.markdown("")  # Spacer
+                    
+                    # Needs Focus: Only show RAs who actually had an INCREASE in issues
+                    st.markdown("**⚠️ Needs Focus**")
+                    # Filter to only RAs with increased issues
+                    ras_with_increase = changes_df[changes_df['change'] > 0].sort_values('change', ascending=False)
+                    
+                    if len(ras_with_increase) > 0:
+                        # Show up to 2 RAs with biggest increase
+                        for _, r in ras_with_increase.head(2).iterrows():
+                            st.markdown(f"<div style='background:#f8d7da; padding:8px; border-radius:5px; margin:4px 0;'>"
+                                       f"<b>{r['ra']}</b><br>"
+                                       f"<span style='color:#721c24; font-size:0.9em;'>{int(r['current'])} issues ({int(r['change']):+d})</span>"
+                                       f"</div>", unsafe_allow_html=True)
+                    else:
+                        # Everyone improved! Show celebratory message
+                        st.markdown(f"<div style='background:#d4edda; padding:8px; border-radius:5px; margin:4px 0;'>"
+                                   f"<span style='color:#155724;'>🎉 All RAs improved!</span>"
+                                   f"</div>", unsafe_allow_html=True)
+                else:
+                    st.info("Need 2+ months for comparison")
+            
+            # Issue Category Breakdown
+            st.markdown("#### 🔍 Issue Types Breakdown")
+            
+            # Get category breakdown for latest month
+            if month_order:
+                latest_month_full = total_trend[total_trend['month_short'] == month_order[-1]]['month'].values[0]
+                category_data = trend_data[
+                    (trend_data['month'] == latest_month_full) & 
+                    (trend_data['issue_category'] != 'Total')
+                ]
+                
+                if not category_data.empty:
+                    # Pivot for heatmap
+                    pivot_data = category_data.pivot_table(
+                        index='ra_name', 
+                        columns='issue_category', 
+                        values='issue_count', 
+                        fill_value=0,
+                        aggfunc='sum'
+                    )
+                    
+                    fig = go.Figure(data=go.Heatmap(
+                        z=pivot_data.values,
+                        x=pivot_data.columns.tolist(),
+                        y=pivot_data.index.tolist(),
+                        colorscale='RdYlGn_r',
+                        text=pivot_data.values,
+                        texttemplate="%{text}",
+                        textfont={"size": 11},
+                        hovertemplate="RA: %{y}<br>Category: %{x}<br>Count: %{z}<extra></extra>"
+                    ))
+                    fig.update_layout(
+                        title=f"Issue Types by RA - {month_order[-1]}",
+                        height=max(300, len(pivot_data) * 35),
+                        xaxis_title="",
+                        yaxis_title=""
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("📊 Quality trend data will appear once you have multiple months of cached data.")
+    
     # Team Totals
     st.markdown("### 📈 Team Totals")
     cols = st.columns(4)
@@ -804,8 +1096,8 @@ def render_ra_of_month(df: pd.DataFrame, month_name: str):
         )
         st.plotly_chart(fig, use_container_width=True)
     
-    # Areas Needing Attention - Heatmap Visualization
-    st.markdown("### ⚠️ Areas Needing Attention")
+    # Focus Areas for Growth - Heatmap Visualization
+    st.markdown("### 🎯 Focus Areas for Growth")
     
     # Create matrix data for heatmap
     heatmap_data = []
