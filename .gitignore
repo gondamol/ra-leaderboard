@@ -30,6 +30,12 @@ MONTHLY_GUIDE.md
 test_*.py
 generate_cache.py
 
+# Presentations (DO NOT PUSH)
+*.pptx
+~$*.pptx
+*Presentation*.html
+create_presentation.py
+
 # Environment
 .env
 *.env
